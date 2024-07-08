@@ -38,16 +38,11 @@ As opposed to directly evaluating the results of the parser, this parser will in
 \vspace{3ex}
 \centering
 \begin{align*}
-\langle \mathit{digit} \rangle &::= \text{`\texttt{0}'} \ldots \text{`\texttt{9}'} \\
-\langle \mathit{number} \rangle &::= \langle \mathit{digit} \rangle+ \\
-\langle \mathit{expr} \rangle &::= \langle \mathit{expr} \rangle \; \text{`\texttt{+}'} \; \langle \mathit{term} \rangle \enspace | \enspace
-                                \langle \mathit{expr} \rangle \; \text{`\texttt{-}'} \; \langle \mathit{term} \rangle \enspace | \enspace
-                                \langle \mathit{term} \rangle \\
-\langle \mathit{term} \rangle &::= \langle \mathit{term} \rangle \; \text{`\texttt{*}'} \; \langle \mathit{atom} \rangle \enspace | \enspace
-                                \langle \mathit{term} \rangle \; \text{`\texttt{/}'} \; \langle \mathit{atom} \rangle \enspace | \enspace
-                                \langle \mathit{atom} \rangle \\
-\langle \mathit{atom} \rangle &::= \text{`\texttt{(}'} \; \langle \mathit{expr} \rangle \; \text{`\texttt{)}'} \enspace | \enspace
-                                \langle \mathit{number} \rangle
+\nt{digit} &::= \sym{0} \ldots \sym{9} \\
+\nt{number} &::= \nt{digit}+ \\
+\nt{expr} &::= \nt{expr} \; \sym{+} \; \nt{term} \alt \nt{expr} \; \sym{-} \; \nt{term} \alt \nt{term} \\
+\nt{term} &::= \nt{term} \; \sym{*} \; \nt{atom} \alt \nt{term} \; \sym{/} \; \nt{atom} \alt \nt{atom} \\
+\nt{atom} &::= \sym{(} \; \nt{expr} \; \sym{)} \alt \nt{number} \\
 \end{align*}
 \caption{The grammar in e\textsc{bnf}.}
 \label{fig:simple-grammar-ebnf}
@@ -71,7 +66,7 @@ enum Expr {
 \caption{The grammar and \textsc{ast} for a simple arithmetic expression language.}
 \end{figure}
 
-\noindent % TODO: remove as necessary if the figure moves
+\noindent
 Recall the e\textsc{bnf} grammar for the arithmetic expression language introduced in the introduction, shown again in \cref{fig:simple-grammar-ebnf}.
 The following parser will parse an expression into the \textsc{ast} represented by the Scala datatype in \cref{fig:simple-grammar-ast}.
 To demonstrate an alternate approach, this parser deals with left-recursion using the lower-level \scala{chain.left1} combinator, rather than the higher-level precedence table \textsc{api}:
@@ -90,7 +85,7 @@ lazy val atom: Parsley[Expr] = '(' ~> expr <~ ')' | number.map(Num(_))
 // Example usage: this parser constructs an AST, rather than evaluating its input
 expr.parse("1+2*3/4") // => Add(Num(1), Div(Mul(Num(2), Num(3)), Num(4)))
 \end{minted}
-\vspace{1ex} % TODO: remove if necessary? idk why the vertical space here is so tiny
+\vspace{1ex}
 %
 Notice that although the form of the parser retains high-level similarities to the grammar, it is more verbose because it encodes semantic actions (i.e. constructing the resulting \textsc{ast}) directly in the parser.
 \begin{itemize}

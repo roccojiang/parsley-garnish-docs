@@ -7,8 +7,6 @@ The ability to simplify parsers, as well as normalising their expression argumen
 This \namecref{sec:complex-rules} first revisits the left-recursion factoring rule from \cref{sec:factor-leftrec}, demonstrating how parser simplification drastically improves the quality of the rule.
 This is followed by a brief exploration of other rules that can be trivially implemented on top of the intermediate \textsc{ast}, rather than the generic Scalameta \textsc{ast}.
 
-% This \namecref{sec:complex-rules} explores the rules that have been implemented on top of the intermediate \textsc{ast}s, rather than the Scalameta \textsc{ast}, to demonstrate the power of the new \scala{Parser} \textsc{ast} in expressing transformations in a more maintainable and readable way.
-
 \section{Removing Left-Recursion: Revisited}\label{sec:leftrec-revisited}
 \Cref{sec:factor-leftrec} left off with a disappointing result for the left-recursion factorisation transformation, producing a mostly unreadable output in \cref{fig:leftrec-example-bad}.
 The transformation can now be revisited given the improvements made to the \scala{Parser} \textsc{ast}.
@@ -71,8 +69,6 @@ trait LiftLike extends Parser {
 }
 \end{minted}
 
-% * Optimisation: normalise leftrec part to see if it comes to empty -- if so, do not inline in the NT case
-
 \subsection{The Improved Rule}
 Being able to normalise parsers lets \texttt{parsley-garnish} make more informed decisions about the result of the transformation.
 By normalising the \scala{leftRec} portion of the unfolded parser, it can be determined whether the transformation was successful or not:
@@ -99,6 +95,8 @@ def transform(results: Option[Expr], nonLeftRec: Parser, leftRec: Parser) = {
   }
 }
 \end{minted}
+
+\pagebreak
 
 \subsection*{The Final Result}
 Finally, the \scala{example} parser from \cref{sec:factor-leftrec} can be automatically transformed into the following form:
@@ -146,7 +144,7 @@ For example:
 % * During expression normalisation, bound variables may be $\alpha$-renamed
 % * So a parser that has not actually changed may still be different when compared to the original
 % * So expressions within the original are also normalised -- $\alpha$-equivalence is preserved between normalised expressions
-% * Then this doesn not result in changing weird things like variable names
+% * Then this does not result in changing weird things like variable names
 
 \section{Avoid Parser Redefinitions}\label{sec:avoid-redefinitions-rule}
 Another rule that can be easily implemented with the new \scala{Parser} \textsc{ast} is to catch cases where a user manually writes out a parser that is already defined in the library.
@@ -158,7 +156,7 @@ parser.rewrite { case ManyP(p <~ sep) => EndBy(p, sep) }
 \end{minted}
 %
 This catches a case where a user writes a parser in the form of \scala{many(p <~ sep)}, which is already defined in \texttt{parsley} as \scala{endBy(p, sep)}.
-Compare this to the equivalent pattern match if working with the low-level \textsc{ast} directly:
+Compare this to the equivalent pattern match if utilising the low-level \textsc{ast}:
 \begin{minted}{scala}
 tree.collect {
   case Term.Apply.After_4_6_0(
@@ -175,14 +173,10 @@ tree.collect {
 %
 This rule is likely to be much more useful in practice than \emph{Simplify Parsers}, serving as a pedagogical tool to guide users towards using the library's higher-level combinators.
 
-% ** although still annoying for e.g. def countMany(p: Parsley[_]): Parsley[Int] = p.foldLeft(0)((n, _) => n + 1)    <---- still no good way to pattern match expr given that "n + 1" is translucent, easier to just reify this back to scala.meta.term and then low-level pattern match
+% Although still annoying for e.g. def countMany(p: Parsley[_]): Parsley[Int] = p.foldLeft(0)((n, _) => n + 1)    <---- still no good way to pattern match expr given that "n + 1" is translucent, for now easier to just reify this back to scala.meta.term and then low-level pattern match
 
 % \section{Convert to Parser Bridge}
-% \TODO{
-% * This would be cool, idk if I have time though, but this should also piggyback off of Func
-% * the pos bridges do not actually exist, so we can ignore that case and just say its too much code synthesis
-% * indicate limitations that this will only work if the ADT is defined in the same file, in order to extend it
-% }
+% Experimental rule, implemented after the report was submitted
 
 \section*{Summary}
 This \namecref{sec:complex-rules} demonstrates how the left-recursion factoring rule is made feasible with the simplification machinery in the new \scala{Parser} \textsc{ast}.
