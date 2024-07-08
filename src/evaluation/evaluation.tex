@@ -4,7 +4,6 @@
 
 \ourchapter{Evaluation}\label{sec:evaluation}
 
-% TODO: signpost that the main contribution is left-recursion transformation so this is the most important thing to evaluate!!
 The project was initially intended to mostly focus on implementing a variety of parser lints, however implementing these rules revealed an unanticipated level of complexity in the infrastructure needed to support them.
 This ended up necessitating a lot more work on the intermediate \scala{Parser} and \scala{Expr} \textsc{ast}s than expected, which has led to a robust internal machinery that allows \texttt{parsley-garnish} to be easily extended with more domain-specific rules in the future.
 However, the time spent on this infrastructure work meant that the variety of implemented linting rules were not as comprehensive as initially desired.
@@ -44,8 +43,8 @@ In all cases, \textsc{nbe} is slightly faster than \textsc{hoas}, which is also 
 
 In the \emph{parser} task, which is representative of the standard use case for the normalisation process, the substitution approach is still relatively performant, taking only 0.5ms to normalise the term.
 This shows that even if \texttt{parsley-garnish} remained with the original approach, the performance would still be acceptable.
-However, the other approaches still outperform this by 50x in this simple case.
-For more complex tasks, this increases to as much as 6000x slower, as in the case of the \emph{eq 40} task.
+However, the other approaches still outperform this by 50\raisebox{-0.6pt}{$\times$} in this simple case.
+For more complex tasks, this increases to as much as 6000\raisebox{-0.6pt}{$\times$} slower, as in the case of the \emph{eq 40} task.
 From the benchmark results it is rather evident that the reasoning behind this is not the total number of variables, since the \emph{eq} tasks have fewer variables than the \emph{tree} tasks, but perform worse.
 Maximum depth is also an unlikely explanation -- rather, it is likely that the individual size of specific terms being substituted is the main factor in the deteriorating performance of the named substitution approach.
 This requires copying and re-constructing objects for each variable substitution, which adds up to a significant amount of overhead.
@@ -73,15 +72,14 @@ val number: Parsley[Int] = digit.foldLeft1(0)((n, d) => n * 10 + d.asDigit)
 
 \subsection{Direct Left-Recursion}
 \emph{Direct} left-recursion is the simplest and most obvious form of left-recursion, where a parser directly refers to itself in its definition.
-Thus, it is the easiest form of left-recursion to detect and handle, regardless of the transformation technique used.
+Thus, it is the easiest case to detect and handle, regardless of the transformation technique used.
 This section evaluates \texttt{parsley-garnish}'s handling of direct left-recursion in a few different scenarios.
 
 \subsubsection{Unary Postfix Operator}
 The following minimal grammar for a postfix unary incrementing operator is directly left-recursive:
-% <inc> ::= <inc> '+' | <number>
-\begin{align*}
-\langle \mathit{inc} \rangle &::= \langle \mathit{inc} \rangle \enspace \text{`\texttt{+}'} \enspace | \enspace \langle \mathit{number} \rangle
-\end{align*}
+\begin{equation*}
+\nt{inc} ::= \nt{inc} \; \sym{+} \alt \nt{number}
+\end{equation*}
 %
 A parser for this grammar, written in left-recursive form, would be as follows:
 \begin{minted}{scala}
@@ -107,11 +105,11 @@ the first argument to \scala{postfix} is obviously the same, but with placeholde
 The second argument can be derived as follows:
 \begin{minted}[baselinestretch=1.5,escapeinside=\%\%]{scala}
 string("+").map(x1 => x2 => Inc(x2))
-% \proofstep{Definition of \texttt{as}:  \texttt{p.as(x) = p.map(\textunderscore => x)}} %
+% \proofstep{definition of \texttt{as}:  \texttt{p.as(x) = p.map(\textunderscore => x)}} %
 string("+") as (x2 => Inc(x2))
 % \proofstep{$\eta$-reduction on \texttt{Inc}} %
 string("+") as Inc
-% \proofstep{Re-introduce \emph{Implicit Conversions} pattern} %
+% \proofstep{re-introduce \emph{Implicit Conversions} pattern} %
 "+" as Inc
 \end{minted}
 %
@@ -154,21 +152,21 @@ This proof will again use Haskell syntax as it is more suitable for equational r
 The goal is to show that \scala{('+' ~> term).map(x1 => x2 => Add(x2, x1))} can be rewritten in the form \scala{op.map(flip) <*> p}, where \scala{p} is \scala{term} and \scala{op} is shown to be \scala{'+' as Add(_, _)}.
 \begin{lstlisting}
     (\x1 x2 -> Add x2 x1) <$> ('+' *> term)
-% \proofstep{Definition of \texttt{flip}} %
+% \proofstep{definition of \texttt{flip}} %
     flip Add <$> ('+' *> term)
-% \proofstep{Definition of \texttt{*>}  (equivalent to \texttt{\~{}>} in Scala):  \texttt{p *> q = const id <\$> p <*> q}} %
+% \proofstep{definition of \texttt{*>}  (equivalent to \texttt{\~{}>} in Scala):  \texttt{p *> q = const id <\$> p <*> q}} %
     flip Add <$> (const id <$> '+' <*> term)
-% \proofstep{Re-association:  \texttt{u <*> (v <*> w) = pure ($\circ$) <*> u <*> v <*> w}} %
+% \proofstep{re-association:  \texttt{u <*> (v <*> w) = pure ($\circ$) <*> u <*> v <*> w}} %
     pure (%$\circ$%) <*> flip Add <$> (const id <$> '+') <*> term
-% \proofstep{Applicative fusion:  \texttt{pure f <*> pure x = pure (f x)}} %
+% \proofstep{applicative fusion:  \texttt{pure f <*> pure x = pure (f x)}} %
     (flip Add .) <$> (const id <$> '+') <*> term
-% \proofstep{Functor composition: \texttt{fmap f $\circ$ fmap g = fmap (f $\circ$ g)}} %
+% \proofstep{functor composition: \texttt{fmap f $\circ$ fmap g = fmap (f $\circ$ g)}} %
     ((flip Add .) . const id) <$> '+' <*> term
-% \proofstep{Point-free manipulation} %
+% \proofstep{point-free manipulation} %
     (flip . const Add) <$> '+' <*> term
-% \proofstep{Functor composition, in reverse} %
+% \proofstep{functor composition, in reverse} %
     flip <$> (const Add <$> '+') <*> term
-% \proofstep{Definition of \texttt{\$>}  (equivalent to \texttt{.as} in Scala)} %
+% \proofstep{definition of \texttt{\$>}  (equivalent to \texttt{.as} in Scala)} %
     flip <$> ('+' $> Add) <*> term
 \end{lstlisting}
 %
@@ -204,11 +202,9 @@ The most significant weakness is the inability to specialise the \scala{postfix}
 \subsection{Indirect Left-Recursion}
 Instances of \emph{indirect} left-recursion are harder to detect, since the parser's reference to itself takes more than one step to reach.
 Consider the following alternative grammar for arithmetic expressions, reduced to only addition for simplicity:
-% <expr> ::= <add> | '(' <expr> ')' | <number>
-% <add> ::= <expr> '+' <expr>
 \begin{align*}
-\langle \mathit{expr} \rangle &::= \langle \mathit{add} \rangle \enspace | \enspace \text{`\texttt{(}'} \; \langle \mathit{expr} \rangle \; \text{`\texttt{)}'} \enspace | \enspace \langle \mathit{number} \rangle \\
-\langle \mathit{add} \rangle &::= \langle \mathit{expr} \rangle \enspace \text{`\texttt{+}'} \enspace \langle \mathit{expr} \rangle 
+\nt{expr} &::= \nt{add} \alt \sym{(} \; \nt{expr} \; \sym{)} \alt \nt{number} \\
+\nt{add} &::= \nt{expr} \; \sym{+} \; \nt{expr}
 \end{align*}
 %
 The indirect left-recursive cycle arises since \scala{expr} firstly needs to parse \scala{add}, which firstly needs to parse \scala{expr}, and so on.
@@ -239,18 +235,16 @@ Although the output compiles and is functionally correct, there are a few areas 
   \item Use of the parser bridge constructor for \scala{Num} is not preserved -- \texttt{parsley-garnish} was unable to resugar this back into its original form, instead leaving it in a more syntactically noisy form with \scala{map}.
 \end{itemize}
 
-% TODO: discussion in future work referencing back to this, talking about resugaring improvements with tagging
-
 \subsection{Hidden Left-Recursion}
 The final class of left-recursive grammars is \emph{hidden} left-recursion, which in general are the most challenging to detect and handle.
 Hidden left-recursion occurs when a parser invokes itself after invoking other parsers that have not consumed any input.
 They generally have a form similar to the following:
 \begin{align*}
-\langle \mathit{a} \rangle &::= \langle \mathit{b} \rangle \; \langle \mathit{a} \rangle \; \dotsb \\
-\langle \mathit{b} \rangle &::= \epsilon
+\nt{a} &::= \nt{b} \; \nt{a} \; \dotsb \\
+\nt{b} &::= \epsilon
 \end{align*}
 %
-In this example, $\langle \mathit{b} \rangle$ is able to derive the empty string, so $\langle \mathit{a} \rangle$ is able to parse $\langle \mathit{b} \rangle$ without consuming input and then invoke itself, creating a left-recursive cycle.
+In this example, $\nt{b}$ is able to derive the empty string, so $\nt{a}$ is able to parse $\nt{b}$ without consuming input and then invoke itself, creating a left-recursive cycle.
 The following rather contrived example showcases a hidden left-recursive cycle in \scala{a}, and the warning that \texttt{parsley-garnish} issues:
 \begin{minted}{scala}
 lazy val a: Parsley[Int] = b ~> a
@@ -274,7 +268,7 @@ This can be seen in the error message, although in this context it is not partic
 Future work could see improvements in the error messages to make them more helpful and informative in the case of hidden left-recursion.
 
 \subsubsection*{Summary}
-The evaluation in this \namecref{sec:eval-leftrec} shows that \texttt{parsley-garnish} is able to detect and handle all forms of left-recursion, although the quality of the output varies depending on the nature of the left-recursion.
+The evaluation in this \namecref{sec:eval-leftrec} shows that \texttt{parsley-garnish} is able to detect and handle all forms of left-recursion, although the quality of the output varies depending on the case.
 Revisiting the evaluation criteria:
 \begin{itemize}
   \item All classes of left-recursion can be detected, although hidden left-recursion cannot be automatically fixed. However, this is mostly due to the difficult nature and inherent ambiguity of grammars with hidden left-recursion.
@@ -282,33 +276,5 @@ Revisiting the evaluation criteria:
   \item The transformed output is generally clear and idiomatic, although there are areas for improvement in the preservation of syntactic sugar. A desirable next step would be to refactor \scala{postfix} parsers into more specialised forms if possible for the given parser.
   \item In most tested cases, the transformed output is able to compile. However, since \texttt{parsley-garnish} tends to prefer creating curried functions, more complex parsers may require manual intervention to fix type inference issues. This is one of the major limitations of the current implementation, as it is undesirable for linters to suggest non-compiling fixes.
 \end{itemize}
-
-% TODO: library ergonomics - see ethan's thesis
-% e.g. Introduce implicit conversions rule -- stunted because no in-editor support
-% want to be able to preview changes in editor, and also apply auto-fixes one by one
-
-
-% A large corpus of student WACC parsers is available to evaluate the real-world applicability of \texttt{parsley-garnish}.
-% This can be utilised to assess the tool's ability to achieve quantitative and qualitative metrics.
-
-% The large number of parsers available to test can help evaluate the correctness and accuracy of each lint rule.
-% We might find that certain rules are more prone to false positives than others, or that some automated refactorings may introduce new issues such as compilation errors.
-% These quantitative metrics can be counted and used to evaluate rules against each other, as well as the overall effectiveness of the tool.
-
-% We can also estimate the proportion of issues that \texttt{parsley-garnish} is able to detect automatically.
-% This can be done by comparing the number of issues detected automatically against the number of issues found manually by a code reviewer.
-
-% Qualitative metrics such as the quality of automated fixes can also be assessed by manually reviewing the output of the tool.
-% For example, an issue I pointed out in the project plan is that the output of the left-recursion transformation may be in a form that is ``ugly'' when it could be simplified to a much more human-readable form.
-% The quality of fixes would affect the practicality of the \texttt{parsley-garnish}, since users may be reluctant to apply automated fixes if the output quality can be poor.
-
-% Furthermore, the performance of \texttt{parsley-garnish} can be evaluated in terms of execution time and resource consumption.
-% There are no direct competitors to benchmark against, but we can still evaluate the tool's performance against a baseline of acceptable performance, or perhaps a collection of other Scala static analysis tools deemed to be of similar complexity.
-% I am thinking of benchmarking the tool during development as well, since it may affect design decisions such as implementing some rules as purely syntactic rather than semantic rules.
-% I am not sure how much resource overhead a semantic rule would incur, so this could be insignificant or a major tradeoff (between speed, correctness, and accuracy) to consider.
-
-% Finally, it is possible to gather feedback from students interested in using \texttt{parsley-garnish} to improve their WACC parsers.
-% User surveys and interviews would provide insights into the tool's usability, helpfulness, and areas for improvement.
-% Although the timing of the WACC Lab does not align with the project timeline, I am hoping that some students may still be interested in trying out the tool on their final WACC submissions or possibly personal projects using \texttt{parsley}.
 
 \end{document}
