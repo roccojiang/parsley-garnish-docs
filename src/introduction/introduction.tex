@@ -29,7 +29,7 @@ The parser will be based on the following e\textsc{bnf} grammar, with standard a
 \nt{number} &::= \nt{digit}+ \\
 \nt{expr} &::= \nt{expr} \; \sym{+} \; \nt{term} \alt \nt{expr} \; \sym{-} \; \nt{term} \alt \nt{term} \\
 \nt{term} &::= \nt{term} \; \sym{*} \; \nt{atom} \alt \nt{term} \; \sym{/} \; \nt{atom} \alt \nt{atom} \\
-\nt{atom} &::= \sym{(} \; \nt{expr} \; \sym{)} \alt \nt{number} \\
+\nt{atom} &::= \sym{(} \; \nt{expr} \; \sym{)} \alt \nt{number}
 \end{align*}
 %
 By closely following the structure of the grammar, a naïve first attempt at writing the parser-evaluator in \texttt{parsley} may resemble the following:
@@ -96,14 +96,6 @@ lazy val expr: Parsley[Float] = precedence('(' ~> expr <~ ')', number)(
 %
 With this definition of \scala{expr}, the parser is able to parse left-associative expressions without left-recursion, and the syntactic noise of the \scala{char} combinators has been removed.
 Executing \scala{expr.parse("1+2*3/4")} now evaluates to \scala{2.5}, as expected!
-
-% Introduces domain-specific lint rules for Parsec-style parser combinator libraries
-% Implementation of these rules for Parsley Scala
-% Developing the required machinery on top of raw AST manipulation, to perform code rewrites for them
-% Producing simplified parser/expression terms is equivalent to Parsley Haskell’s high-level optimisations
-% This holds for any algebra-based DSL where code transformations perform algebraic operations → requires simplification based on algebraic laws
-% E.g. Finally, a Polymorphic Linear Algebra Language (Pearl)
-% If you implement simplifications for a code-rewriting linter, you unlock staged optimisations ⇔ if you implement staged optimisations, you unlock easily writing auto-fix lints
 
 \section*{Contributions}
 This project introduces two major contributions in separate areas:

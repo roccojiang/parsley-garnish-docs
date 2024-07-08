@@ -328,7 +328,7 @@ Semantic rules are implemented in the same manner as \cref{fig:syntactic-rule-ex
 This allows rule authors to query \textsc{ast} nodes for their associated symbols: textual identifiers that represent definitions in the Scala program.
 Although symbols are not guaranteed to be unique outside the document they are defined in~\cite{scalameta_semanticdb_spec_2023}, within the context of Scalafix rule authoring, they can be treated as unique since rules are applied per-file.
 
-\begin{figure}[htbp]
+\begin{figure}[htb]
 \begin{subfigure}{\textwidth}
 \begin{minted}{scala}
 class IdentifyIntAddition extends SemanticRule("IdentifyIntAddition") {

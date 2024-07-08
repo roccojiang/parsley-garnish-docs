@@ -175,7 +175,8 @@ The same proof can be applied to the other operators, and the \scala{map} combin
 \text{\scala{(u | v).map(f)}} \enspace = \enspace \text{\scala{u.map(f) | v.map(f)}}
 \end{equation*}
 %
-Therefore, the proof shows that the final term obtained from \texttt{parsley-garnish} can be rewritten in the form \scala{op.map(flip) <*> p}, so the obtained \scala{postfix} parser is equivalent to the hand-written version using \scala{chain.left1}.
+The proof shows that the final term obtained by \texttt{parsley-garnish} can be rewritten in the form \scala{op.map(flip) <*> p}.
+Thus, the obtained \scala{postfix} parser is equivalent to the hand-written version using \scala{chain.left1}.
 
 \subsubsection{Evaluating the Arithmetic Expression Language}
 The evaluating parser variant of the same grammar, as presented in the introduction, has the same resulting form:

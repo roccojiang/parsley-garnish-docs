@@ -49,9 +49,7 @@ This transformation is applied in-order to each parser in the source file, repla
 An unfolded parser is recombined using \scala{chain.postfix}: this combinator encapsulates the general form of left-associative parsing, and most other iterative combinators can be derived from it~\cite{willis_parsley_2024}.
 \begin{minted}{scala}
 def transform(
-  results: Option[A],
-  nonLeftRec: Parsley[A],
-  leftRec: Parsley[A => A]
+  results: Option[A], nonLeftRec: Parsley[A], leftRec: Parsley[A => A]
 ): Parsley[A] = {
   val result: Parsley[A] = results match {
     case None    => empty
@@ -267,10 +265,8 @@ object VariableDecl {
       // If the pattern match is successful, convert the definition body to a Parser
       // Collect metadata and bundle into a parser definition object
       ParserDefn(
-        name = varName,
-        parser = body.toParser,
-        tpe = getParsleyType(varName),
-        originalTree = body
+        name = varName, parser = body.toParser,
+        tpe = getParsleyType(varName), originalTree = body
       )
     // ... similar cases for Defn.Var and Defn.Def
   }
@@ -381,7 +377,8 @@ the choice operation represented by the \scala{|} combinator is \emph{left-biase
 \begin{minted}{scala}
 case class <|>(p: Parser, q: Parser) extends Parser {
   def unfold() = {
-    val ((pe, pn, pl), (qe, qn, ql)) = (p.unfold, q.unfold)
+    val (pe, pn, pl) = p.unfold
+    val (qe, qn, ql) = q.unfold
     (pe.orElse(qe), pn | qn, pl | ql)
   }
 }
@@ -408,7 +405,8 @@ Given the above observations, the implementation of the \scala{<*>} combinator's
 \begin{minted}{scala}
 case class <*>(p: Parser, q: Parser) extends Parser {
   def unfold() = {
-    val ((pe, pn, pl), (qe, qn, ql)) = (p.unfold, q.unfold)
+    val (pe, pn, pl) = p.unfold
+    val (qe, qn, ql) = q.unfold
 
     val result = for {
       f <- pe
@@ -417,13 +415,13 @@ case class <*>(p: Parser, q: Parser) extends Parser {
 
     val nonLefts = {
       val lnl = pn <*> q
-      val rnl = pe.map(q"f => qn.map(f)").getOrElse(Empty) // f <$> qn
+      val rnl = pe.map(q"f => ${qn}.map(f)").getOrElse(Empty) // f <$> qn
       lnl | rnl
     }
 
     val lefts = {
       val llr = pl.map(q"flip") <*> q
-      val rlr = pe.map(q"$ql.map(compose)").getOrElse(Empty) // f.map(compose) <$> ql
+      val rlr = pe.map(q"${ql}.map(compose)").getOrElse(Empty) // f.map(compose) <$> ql
       llr | rlr
     }
 
@@ -478,11 +476,13 @@ def compose[A, B, C](f: B => C)(g: A => B)(x: A): C = f(g(x))
 %
 Although this is not very aesthetically pleasing, it is necessary to bring these higher-order functions into scope for the transformed code to make use of them.
 
+\pagebreak
+
 \subsection*{Success...?}
 With the unfolding transformations defined for all core combinators, the left-recursion factoring transformation is now complete.
 Running the transformation on the \scala{example} parser yields the output in \cref{fig:leftrec-example-bad}.
 %
-\begin{figure}[htbp]
+\begin{figure}[!htb]
 \begin{minted}{scala}
 def flip[A, B, C](f: A => B => C)(x: B)(y: A): C = f(y)(x)
 def compose[A, B, C](f: B => C)(g: A => B)(x: A): C = f(g(x))
@@ -500,7 +500,7 @@ lazy val example: Parsley[String] = chain.postfix(
 \label{fig:leftrec-example-bad}
 \end{figure}
 
-\noindent % TODO: keep/remove this depending on if needed, based on positioning of the figure
+\noindent
 This is... disappointing, to say the least.
 There are \emph{many} things wrong with the transformed output:
 \begin{itemize}
@@ -512,6 +512,7 @@ There are \emph{many} things wrong with the transformed output:
 The result is discouraging especially because it is not impossible to factor out the left-recursion in a nice manner:
 a hand-written equivalent using \scala{postfix} would resemble the concisely defined parser in \cref{fig:leftrec-example-hand}.
 There is still hope, though -- if the \scala{empty} combinators can be removed and something is done about the higher-order functions, perhaps \cref{fig:leftrec-example-bad} could be salvaged into something that looks more like the human-written version.
+\newline % without newline the figure is a bit too close to the paragraph
 
 \begin{figure}[htbp]
 \begin{minted}{scala}

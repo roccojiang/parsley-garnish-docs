@@ -58,7 +58,6 @@ In this instance, the compiler provides a detailed error message indicating the 
 However, the compiler is not always able to report such issues clearly. For instance, switching the position of the intended implicit conversion results in a less helpful message:
 \begin{minted}{scala}
 val p = "garnis" <~ 'h'
-p.parse("garnish")
 // [error] value <~ is not a member of String
 //    val p = "garnis" <~ 'h'
 //            ^^^^^^^^^^^
@@ -83,7 +82,7 @@ but where the user has erroneously additionally imported the \scala{stringLift} 
 This results in the Scala compiler throwing an error on line 6 due to ambiguous implicits.
 When run on this file, \texttt{parsley-garnish} will report a warning similar to that shown in \cref{fig:ambiguous-implicits-warning}.
 
-\begin{figure}[htbp]
+\begin{figure}[!hb]
 \begin{subfigure}{\textwidth}
 \begin{minted}[frame=single,linenos]{scala}
 object parser {
@@ -106,14 +105,11 @@ object lexer {
 \begin{subfigure}{\textwidth}
 \vspace{3ex}
 \begin{minted}[frame=single,fontsize=\small]{text}
-warning: [AmbiguousImplicitConversions] This import may cause clashing implicit conversions:
+warning: [AmbiguousImplicitConversions] These imports may cause clashing implicit conversions:
 * import parsley.syntax.character.stringLift at line 2
 * import lexer.implicits._ at line 3
 If this is the case, you may encounter confusing errors like 'method is not a member of String'.
-To fix this, ensure that you only import a single implicit conversion.
-
-  import lexer.implicits._
-  ^^^^^^^^^^^^^^^^^^^^^^^^  
+To fix this, ensure that there is only one of these imports in scope.
 \end{minted}
 \caption{The warning message reported at line 3 by the \emph{Ambiguous Implicit Conversions} lint rule.}
 \label{fig:ambiguous-implicits-warning}
@@ -124,7 +120,7 @@ To fix this, ensure that you only import a single implicit conversion.
 \subsection{Implementation as a Syntactic Lint Rule}
 The rule uses the following heuristics to determine if an import clause brings an implicit into scope:
 \begin{itemize}
-  \item An import clause of the form \scala{import parsley.syntax.character.xxx}, where \scala{xxx} is either a wildcard import or specifically contains the importee \scala{stringLift}, indicates the \emph{Implicit Conversions} pattern on string values.
+  \item An import of the form \scala{import parsley.syntax.character.x}, where \scala{x} is either a wildcard import or specifically contains the importee \scala{stringLift}, indicates the \emph{Implicit Conversions} pattern on string values.
   \item The import path for the \emph{Implicit Lexer} pattern is subject to how the user names their lexer object, so determining this is more heuristic-based. The following cases are considered indicative of this pattern:
   \begin{itemize}
     \item An import containing the keyword \scala{lexer}, as well as either \scala{implicit} or \scala{implicits}.
@@ -151,7 +147,32 @@ extension (tree: Tree) {
 \end{minted}
 %
 Scoping rules can then be respected by using this information to determine which previously visited imports are still in scope at any given point in the traversal.
-With this, \cref{fig:ambiguous-implicits-impl} shows the core logic of the rule, implemented as a \emph{tail-recursive} visit over the list of imports, which allows the Scala compiler to optimise the recursion into an efficient iterative loop.
+Thus, \cref{fig:ambiguous-implicits-impl} shows the core logic of the rule, implemented as a \emph{tail-recursive} visit over the list of imports: this allows the Scala compiler to optimise the recursion into an efficient iterative loop.
+%
+\begin{figure}[!hb]
+\begin{minted}{scala}
+def visit(toVisit: List[Import], seen: List[Import], patch: Patch): Patch = toVisit match {
+  case curr :: remaining =>
+    val currentScope = curr.parent.get // Parent node represents import's scope
+    // Which imports are in scope at this point: lexical ordering is maintained
+    // by only considering imports that have been defined in the file so far
+    val alreadyInScope = seen.filter(currentScope.isWithinScope(_.parent.get))
+    val currentInScope = alreadyInScope :+ curr
+    val clashingImports = getClashingImports(currentInScope)
+    if (getClashingImports(alreadyInScope).isEmpty && clashingImports.nonEmpty) {
+      visit(remaining, currentInScope, patch +
+        Patch.lint(AmbiguousImplicitConversionsLint(curr, clashingImports)))
+    } else {
+      // Continue traversal, discarding imports that have fallen out of scope
+      visit(remaining, currentInScope, patch)
+    }
+  case Nil => patch
+}
+\end{minted}
+\caption{Implementation of the core logic for the \emph{Ambiguous Implicit Conversions} lint rule.}
+\label{fig:ambiguous-implicits-impl}
+\end{figure}
+%
 The \scala{getClashingImports} method uses the heuristic rules described above to determine which implicits are brought into scope by an import.
 If an import brings in both types of implicits for the first time within its enclosing scope, a patch is generated to report a diagnostic.
 The traversal then continues recursively, updating its list of visited imports.
@@ -164,33 +185,6 @@ override def fix(implicit doc: SyntacticDocument): Patch = {
 }
 \end{minted}
 
-\begin{figure}[htbp]
-\begin{minted}{scala}
-def visit(unvisited: List[Import], visited: List[Import], patches: Patch): Patch = {
-  unvisited match {
-    case curr :: remaining =>
-      val currentScope = curr.parent.get // Parent node represents import's scope
-      // Which imports are in scope at this point: lexical ordering is maintained
-      // by only considering imports that have been defined in the file so far
-      val alreadyInScope = visited.filter(currentScope.isWithinScope(_.parent.get))
-      val currentInScope = alreadyInScope :+ curr
-      val clashingImports = getClashingImports(currentInScope)
-
-      if (getClashingImports(alreadyInScope).isEmpty && clashingImports.nonEmpty) {
-        visit(remaining, currentInScope, patches +
-          Patch.lint(AmbiguousImplicitConversionsLint(curr, clashingImports)))
-      } else {
-        // Continue traversal, discarding imports that have fallen out of scope
-        visit(remaining, currentInScope, patches)
-      }
-    case Nil => patches
-  }
-}
-\end{minted}
-\caption{Implementation of the core logic for the \emph{Ambiguous Implicit Conversions} lint rule.}
-\label{fig:ambiguous-implicits-impl}
-\end{figure}
-
 \section{Remove Explicit Usage of Implicit Conversions}\label{sec:no-explicit-implicits}
 % https://edstem.org/us/courses/46813/discussion/4185813
 \texttt{parsley} users who are new to Scala may not be aware that implicit conversions are automatically applied by the Scala compiler.
@@ -201,7 +195,7 @@ This mistake can be classified as a code smell -- although it does not cause com
 Writing parsers like this is counterproductive, as it negates the purpose of the \emph{Implicit Conversions} patterns.
 \Cref{fig:explicit-implicits-rewrite} shows how the same parsers should be idiomatically written, removing the explicit application of implicit conversion functions: as long as the implicits are in scope, the Scala compiler will automatically apply them.
 
-\begin{figure}[htbp]
+\begin{figure}[htb]
 \begin{subfigure}{\textwidth}
 \begin{minted}[frame=single,linenos]{scala}
 import parsley.syntax.character._
@@ -238,7 +232,6 @@ val implicitConv = SymbolMatcher.normalized(
   "parsley.syntax.character.stringLift",
   "parsley.token.symbol.ImplicitSymbol.implicitSymbol"
 )
-
 override def fix(implicit doc: SemanticDocument) = doc.tree.collect {
   // Match a function call with a single argument, using the symbol matcher 'implicitConv'
   // The syntactic naming of the function is ignored,
