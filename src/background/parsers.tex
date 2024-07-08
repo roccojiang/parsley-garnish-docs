@@ -66,7 +66,7 @@ enum Expr {
 \caption{The grammar and \textsc{ast} for a simple arithmetic expression language.}
 \end{figure}
 
-\noindent % TODO: remove as necessary if the figure moves
+\noindent
 Recall the e\textsc{bnf} grammar for the arithmetic expression language introduced in the introduction, shown again in \cref{fig:simple-grammar-ebnf}.
 The following parser will parse an expression into the \textsc{ast} represented by the Scala datatype in \cref{fig:simple-grammar-ast}.
 To demonstrate an alternate approach, this parser deals with left-recursion using the lower-level \scala{chain.left1} combinator, rather than the higher-level precedence table \textsc{api}:
@@ -85,7 +85,7 @@ lazy val atom: Parsley[Expr] = '(' ~> expr <~ ')' | number.map(Num(_))
 // Example usage: this parser constructs an AST, rather than evaluating its input
 expr.parse("1+2*3/4") // => Add(Num(1), Div(Mul(Num(2), Num(3)), Num(4)))
 \end{minted}
-\vspace{1ex} % TODO: remove if necessary? idk why the vertical space here is so tiny
+\vspace{1ex}
 %
 Notice that although the form of the parser retains high-level similarities to the grammar, it is more verbose because it encodes semantic actions (i.e. constructing the resulting \textsc{ast}) directly in the parser.
 \begin{itemize}
